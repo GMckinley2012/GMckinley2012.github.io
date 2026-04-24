@@ -8,3 +8,4 @@ Cybersecurity professional and data science graduate student focused on building
 
 - **Email:** [GMCyberIntel@outlook.com](mailto:GMCyberIntel@outlook.com)
 - **LinkedIn:** https://www.linkedin.com/in/gabrialemckinley
+[View My Resume](resume.html)
