@@ -13,8 +13,7 @@ Welcome to my professional data science portfolio. This site highlights my work 
 ## Portfolio Sections
 
 ### 1. Statistics: The Retrospective  
-[View Statistics Analysis]([paper2.rmd]
-(https://github.com/GMckinley2012/GMckinley2012.github.io/blob/main/paper2.Rmd))
+[View Statistics Analysis] ([paper2.rmd](https://github.com/GMckinley2012/GMckinley2012.github.io/blob/main/paper2.Rmd))
 
 This section includes exploratory data analysis, descriptive statistics, hypothesis testing, and statistical validation connected to my median black income project.
 
