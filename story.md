@@ -6,18 +6,20 @@ This data storytelling project explores the importance of Black voter participat
 
 ## How to Use the Dashboard
 
-Click the link below to view and interact with the full dashboard:
+Hover over the dashboard to view details. Use the available filters and controls to explore the data interactively.
 
-👉 **[View Interactive Dashboard](story.html)**
-
-## Preview
-
-![Dashboard Preview](https://public.tableau.com/static/images/Bl/BlackVotersMatter/Dashboard1/1.png)
+<iframe 
+src="https://public.tableau.com/views/BlackVotersMatter/Dashboard1?:showVizHome=no&:embed=true&:toolbar=yes"
+width="100%" 
+height="900" 
+frameborder="0" 
+allowfullscreen>
+</iframe>
 
 ## Deliverables
 
 **Live GitHub Pages URL:**  
-Paste your live link here.
+Paste your live GitHub Pages link here.
 
 **Repository Markdown File:**  
-Paste your repo link here.
+Paste your raw `story.md` GitHub repository link here.
