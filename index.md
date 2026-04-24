@@ -13,14 +13,14 @@ Welcome to my professional data science portfolio. This site highlights my work 
 ## Portfolio Sections
 
 ### 1. Statistics: The Retrospective  
-[View Statistics Analysis](statistics.html)
+[View Statistics Analysis](paper2.rmd)
 
 This section includes exploratory data analysis, descriptive statistics, hypothesis testing, and statistical validation connected to my median black income project.
 
 ---
 
 ### 2. Machine Learning: The Prediction  
-[View Machine Learning Workflow] (student_performance_machine_learning.ipynb)
+[View Machine Learning Workflow] ([student_performance_machine_learning.ipynb](https://github.com/GMckinley2012/GMckinley2012.github.io/blob/main/student_performance_machine_learning.ipynb))
 
 This section includes feature engineering, model training, model evaluation, and predictive analysis.
 
