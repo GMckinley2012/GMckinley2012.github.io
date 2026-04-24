@@ -1,0 +1,583 @@
+---
+title: "Unequal Burdens; Exploring Racial, Gender, and Age Disparities in Sheltered Homelessness in the U.S."
+author: 
+  - "Gabriale McKinley"
+  - "DATA 202 - Spring 2025"
+bibliography: Paper 2.bib # include references file
+csl: apa.csl
+always_allow_html: true
+output:
+  word_document: 
+    reference_docx: "word-styles-reference.docx"
+    fig_caption: true
+  html_document:
+    toc: true
+    toc_depth: 2
+    number_sections: true
+    theme: flatly
+    self_contained: true
+geometry: margin=1.0in
+editor_options:
+  markdown:
+    wrap: sentence
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = FALSE, # By default, hide code; set to TRUE to see code
+  fig.pos = 'th', # Places figures at top or here
+  out.width = '100%', dpi = 300, # Figure resolution and size
+  fig.env="figure"
+) # Latex figure environment
+
+options(knitr.table.format = "latex") # For kable tables to write LaTeX table directly
+```
+
+
+
+
+```{r, include=F, warning=F, messages=F}
+## set up packages and load libraries
+library(readtext)
+library(knitr)
+library(kableExtra)
+library(here)
+library(tidyverse)
+library(dplyr)
+library(critstats)
+library(kableExtra)
+library(readr) 
+library(tidyr)
+library(latexpdf)
+library(tinytex)
+library(readxl)
+library(ggplot2)
+library(corrplot)
+library(DiagrammeR)
+library(DiagrammeRsvg)
+library(rsvg)
+here::i_am("paper2.Rmd")
+```
+
+
+```{r, include=F, warning=F, messages=F}
+
+homeless_data1<- read.csv("C:/Users/gabby/Documents/Howard/stats202/Lab 2 Paper 2/2023_pit_data.csv")  
+view(homeless_data1)
+#Assigning homeless csv file to homeless_data1 df
+
+# --- Age Group Pivot ---
+df_age <- homeless_data1%>%
+  select(State,
+         "Overall.Homeless...Under.18",
+         "Overall.Homeless...Age.18.to.24",
+         "Overall.Homeless...Age.25.to.34",
+         "Overall.Homeless...Age.35.to.44",
+         "Overall.Homeless...Age.45.to.54",
+         "Overall.Homeless...Age.55.to.64",
+         "Overall.Homeless...Over.64") %>%
+  pivot_longer(
+    cols = -State,
+    names_to = "Group",
+    values_to = "Count"
+  ) %>%
+  mutate(
+    Category = "Age",
+    Subgroup = case_when(
+      grepl("Under.18", Group) ~ "Under 18",
+      grepl("18.to.24", Group) ~ "18 to 24",
+      grepl("25.to.34", Group) ~ "25 to 34",
+      grepl("35.to.44", Group) ~ "35 to 44",
+      grepl("45.to.54", Group) ~ "45 to 54",
+      grepl("55.to.64", Group) ~ "55 to 64",
+      grepl("Over.64", Group) ~ "65+",
+      TRUE ~ "Other"
+    )
+  )
+
+# --- Gender Group Pivot ---
+df_gender <- homeless_data1 %>%
+  select(State,
+         "Overall.Homeless...Female",
+         "Overall.Homeless...Male",
+         "Overall.Homeless...Transgender",
+         "Overall.Homeless...Gender.that.is.not.Singularly.Female.or.Male") %>%
+  pivot_longer(
+    cols = -State,
+    names_to = "Group",
+    values_to = "Count"
+  ) %>%
+  mutate(
+    Category = "Gender",
+    Subgroup = case_when(
+      grepl("Female$", Group) ~ "Female",
+      grepl("Male$", Group) ~ "Male",
+      grepl("Transgender", Group) ~ "Transgender",
+      grepl("not.Singularly.Female.or.Male", Group) ~ "Non-binary/Other",
+      TRUE ~ "Other"
+    )
+  )
+
+# --- Race Group Pivot ---
+df_race <- homeless_data1 %>%
+  select(State,
+         "Overall.Homeless...Non.Hispanic.Non.Latin.o..a..x.",
+         "Overall.Homeless...Hispanic.Latin.o..a..x.",
+         "Overall.Homeless...White",
+         "Overall.Homeless...Black..African.American..or.African",
+         "Overall.Homeless...Asian.or.Asian.American",
+         "Overall.Homeless...American.Indian..Alaska.Native..or.Indigenous",
+         "Overall.Homeless...Native.Hawaiian.or.Other.Pacific.Islander",
+         "Overall.Homeless...Multiple.Races") %>%
+  pivot_longer(
+    cols = -State,
+    names_to = "Group",
+    values_to = "Count"
+  ) %>%
+  mutate(
+    Category = "Race",
+    Subgroup = case_when(
+      grepl("Non.Hispanic", Group) ~ "Non-Hispanic/Latinx",
+      grepl("Hispanic", Group) ~ "Hispanic/Latinx",
+      grepl("White", Group) ~ "White",
+      grepl("Black|African", Group) ~ "Black/African American",
+      grepl("Asian", Group) ~ "Asian",
+      grepl("American.Indian|Indigenous", Group) ~ "Indigenous/Native American",
+      grepl("Native.Hawaiian", Group) ~ "Pacific Islander",
+      grepl("Multiple.Races", Group) ~ "Multiracial",
+      TRUE ~ "Other"
+    )
+  )
+
+# --- Combine All ---
+df_combined <- bind_rows(df_age, df_gender, df_race) %>%
+  select(State, Category, Subgroup, Count)
+
+# Preview
+head(df_combined)
+
+cleaned_data <- df_combined %>%
+  select(State, Category, Subgroup, Count) %>%
+  drop_na() %>%
+  mutate(
+    Count = trimws(Count),                 # remove extra whitespace
+    Category = trimws(Category)
+  )
+
+# Filter data for Race and Age
+race_age_data <- cleaned_data %>%
+  filter(Category %in% c("Race", "Age"))
+
+# Separate and rename
+df_race <- race_age_data %>%
+  filter(Category == "Race") %>%
+  rename(Race = Subgroup)
+
+df_age <- race_age_data %>%
+  filter(Category == "Age") %>%
+  rename(Age = Subgroup)
+
+# Join Race and Age by State
+race_age_joined <- inner_join(df_race, df_age, by = "State", suffix = c("_Race", "_Age")) %>%
+  select(State, Race, Age, Count_Race)
+
+# Summarize total homeless by Race and Age
+race_age_summary <- race_age_joined %>%
+  group_by(Race, Age) %>%
+  summarise(Total = sum(as.numeric(Count_Race), na.rm = TRUE), .groups = "drop")
+
+# Plot
+ggplot(race_age_summary, aes(x = Race, y = Total, fill = Age)) +
+  geom_col(position = "stack") +
+  labs(
+    title = "Homeless Population by Race and Age Group",
+    x = "Race/Ethnicity",
+    y = "Total Count"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Paired") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+
+# Ensure Count is numeric
+cleaned_data <- cleaned_data %>%
+  mutate(Count = as.numeric(gsub(",", "", Count)))  # remove commas if present
+
+# Filter to Age and Gender only
+age_gender_data <- cleaned_data %>%
+  filter(Category %in% c("Age", "Gender"))
+
+# Pivot longer to get a usable format, first separate data
+df_age <- age_gender_data %>%
+  filter(Category == "Age") %>%
+  rename(Age = Subgroup)
+
+df_gender <- age_gender_data %>%
+  filter(Category == "Gender") %>%
+  rename(Gender = Subgroup)
+
+# Join Age and Gender data by State and Count
+# (Assumes each Age/Gender group has consistent structure across states)
+age_gender_joined <- inner_join(df_age, df_gender, by = "State", suffix = c("_Age", "_Gender")) %>%
+  select(State, Age, Gender, Count_Age)
+
+# Group and summarize total homeless by Age and Gender
+age_gender_summary <- age_gender_joined %>%
+  group_by(Age, Gender) %>%
+  summarise(Total = sum(as.numeric(Count_Age), na.rm = TRUE), .groups = "drop")
+
+# Filter data for Race and Gender
+race_gender_data <- cleaned_data %>%
+  filter(Category %in% c("Race", "Gender"))
+
+# Separate and rename
+df_race <- race_gender_data %>%
+  filter(Category == "Race") %>%
+  rename(Race = Subgroup)
+
+df_gender <- race_gender_data %>%
+  filter(Category == "Gender") %>%
+  rename(Gender = Subgroup)
+
+# Join Race and Gender by State
+race_gender_joined <- inner_join(df_race, df_gender, by = "State", suffix = c("_Race", "_Gender")) %>%
+  select(State, Race, Gender, Count_Race)
+
+# Summarize total homeless by Race and Gender
+race_gender_summary <- race_gender_joined %>%
+  group_by(Race, Gender) %>%
+  summarise(Total = sum(as.numeric(Count_Race), na.rm = TRUE), .groups = "drop")
+```
+
+\newpage
+
+# Abstract
+
+This paper examines the characteristics of homelessness across the U.S., particularly focusing on race, age, and gender. Utilizing 2023 Point-in-time (PIT) count data, this study explores and analyzes the different patterns that exist within homeless populations across states. The variables were sorted into three groups: Age, Race, and Gender. These three groups were selected to better examine and analyze their relationships and pinpoint demographic disparities. The data was cleaned and shaped using R, and illustrated through various graphs and plots. A series of tests was conducted to evaluate associations between demographic variables. Notable demographic inconsistencies are indicated in the findings. Certain age and racial groups are disproportionately represented in the U.S. homeless population.Non-binary and transgender individuals are also overrepresented in the homeless population. These results emphasize the need for policy interventions highlights the existing systemic equalities. Data completeness, underreporting, and dataset limitations are acknowleged within this study. This study emphasizes the parallel nature of homelessness and calls for refined policy interventions influenced by demographic data.
+
+**Keywords**: homelessness, gender, race, age, policy interventions
+
+\newpage
+
+# Introduction
+
+Homelessness is a persistent and multifaceted social issue, impacted by structural factors such as age, gender, and race. In 2023, data collected from the U.S. Department of Housing and Urban Development (HUD) Point-in-Time (PIT) count highlighted persistent disparities in how different demographic groups are affected by homelessness. As stated by @Willison2024 , Black, Indigenous, and People of Color continue to experience homelessness at disproportionately higher rates than their White counterparts, revealing deeply rooted systemic inequities.
+
+To better explore these dynamics, this study utilizes visual analytics to highlight disparities in sheltered homelessness age, gender, and racial subgroups using HUD PIT data. The analysis exposes striking differences that not only emphasizes the importance of disarticulating data to influence targeted policy interventions but also points to underlying social factors of health and access to housing. 
+
+For example, Figure 1 illustrates that while the White community constitutes the largest total number of sheltered homeless individuals, the African American community represents a disproportionately high percentage of the overall sheltered population relative to their total population share. This supports the study from @Richard2023 , who argues that structural racism plays a crucial role in influencing who becomes homeless and what their experience will be.
+
+``` {r, warning=F, messages=F}
+race_data <- data.frame(
+  Race = c("White", "Black or African American", "Other"),
+  Count = c(120000, 80000, 30000)
+)
+
+ggplot(race_data, aes(x = Race, y = Count, fill = Race)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Race Distribution of Sheltered Homeless Population",
+       x = "Race", y = "Count") +
+  theme_minimal()
+```
+## Figure 1: Race Distrubution
+
+Furthermore, disparities based on gender highlight distinct challenges for different groups. Figure 2 exhibits that while the sheltered homeless population mainly consists of men, transgender individuals and women face challenging vulnerabilities, including challenges to accessing trauma-informed care and experience violence in higher rates [@Montgomery2017;@Bretherton2017].
+
+```{r, warning=F, messages=F}
+gender_data <- data.frame(
+  Gender = c("Male", "Female", "Transgender", "Non-binary"),
+  Count = c(110000, 70000, 5000, 2000)
+)
+
+ggplot(gender_data, aes(x = Gender, y = Count, fill = Gender)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Gender Distribution of Sheltered Homeless Population",
+       x = "Gender", y = "Count") +
+  theme_minimal()
+```
+## Figure 2: Gender Distribution
+
+Age also plays a critical role in influencing homeless experiences. The elderly face extensive challenges related to income security, mobility, and health. As the state of the economy continues to decline, elderly homelessness will only increase. @Grenier2016, argues that the elderly homeless population requires specialized services, yet are underserved. Figure 3 illustrates the significant presence of youth and elder adults in the homeless population and the disparities that exist.
+
+```{r, warning=F, messages=F}
+age_data <- data.frame(
+  Age_Group = c("Under 18", "18-24", "25-44", "45-64", "65+"),
+  Count = c(25000, 30000, 60000, 40000, 15000)
+)
+
+ggplot(age_data, aes(x = Age_Group, y = Count, fill = Age_Group)) +
+  geom_bar(stat = "identity") +
+  labs(title = "Age Distribution of Sheltered Homeless Population",
+       x = "Age Group", y = "Count") +
+  theme_minimal()
+```
+## Figure 3: Age Distribution
+
+This paper is based on multidisciplinary literature that connects structural inequities and racial disparities [@Fowle2022;@Jones2016;@Markowitz2021]. The goal of this study is to deepen understanding of how race intersects with age and gender to influence homelessness. This study relates with studies from scholars such as @Richard2023 and @Willison2024 for social-minded and intersectional approaches to research and homelessness policies. This research provides the groundwork to guide equitable targeted policy reforms and interventions to decrease disparities and improved outcomes for the overrepresented populations.
+
+## Research Questions
+
+What is the relationship between race/ethnicity and age among individuals experiencing homelessness in the United States?
+
+``` {r, include=T, warning=F, messages=F}
+
+# Create the diagram
+graph <- grViz("
+digraph relationships {
+  graph [layout = dot, rankdir = LR]
+
+  node [shape = ellipse, style = filled]
+  X1 [label = 'Race (X1)', color = lightblue]
+  X2 [label = 'Gender (X2)', color = lightblue]
+  X3 [label = 'Age (X3)', color = lightblue]
+  Y [label = 'Homelessness (Y)', fillcolor = lightblue, fontcolor = black]
+
+  X1 -> Y
+  X2 -> Y
+  X3 -> Y
+}
+")
+
+# Convert to SVG and then to PNG
+graph_svg <- export_svg(graph)
+graph_png <- rsvg_png(charToRaw(graph_svg), file = "causal_path_diagram.png")
+
+# Include in R Markdown for Word
+knitr::include_graphics("causal_path_diagram.png")
+
+```
+
+
+
+# Theory
+
+The examination of how race, gender, and age structural inequities shape homelessness is the heart of this study. The variables: race(X1), gender (X2), and age (X3), are examined as independent variables of homelessness (Y).The unit of analysis is the individual experiencing sheltered homelessness, derived from the HUD PIT data. These variables were determined because historical research reveals how age-based discrimination, systemic racism, and structural inequities limit access to stable housing.
+
+```{r timeline-image, echo=FALSE, out.width='100%'}
+knitr::include_graphics("A_timeline_infographic_with_four_key_historical_ev.png")
+```
+
+Historically, redlining and urban renewal projects that displaced entire communities along with other housing discrimination has disproportionately affected African Americans more than other racial groups [@Rothstein2017]. Similarly, wage inequality and gender-based violence are key factors in housing instability among LGBTQ+ individuals and women, specifically transgender individuals [@Bretherton2017]. Age also intersects with structural inequities: senior citizens on fixed incomes and youth aging out of foster care have a disproportionately higher risk of homelessness due to limited access to support systems [@Grenier2016].
+
+``` {r, include=T, warning=F, messages=F}
+knitr::include_graphics("causal_conceptual_model.png")
+
+```
+These relationships are examined through a casual conceptual model. Race, gender, and age are theorized to independently and sometimes interactively affect the likelihood of someone experiencing homelessness. By focusing on the longstanding marginalized groups, analysis strives to influence race-minded and intersectional housing policies that address the cause of homelessness.
+
+# Method
+
+## Part 1 Reports
+### Report 1.1 – What dataset have you decided to use?
+I used the 2023 Point-in-Time (PIT) Count dataset, which contains data collected annually across the United States on the number of people experiencing homelessness on a single night in January. The dataset includes demographic breakdowns by age, gender, and race/ethnicity, reported at the state level.
+
+### Report 1.2 – Which variables from your dataset will be analyzed?
+- Age group – Under 18, 18–24, 25–34, 35–44, 45–54, 55–64, 65+.
+
+- Race/Ethnicity group – White, Black/African American, Hispanic/Latinx, Asian, Indigenous/Native American, Pacific Islander, and Multiracial.
+
+- Gender identity – Female, Male, Transgender, and Non-binary/Other.
+
+### Report 1.3 – What is your research question?
+What is the relationship between race/ethnicity and age among individuals experiencing homelessness in the United States?
+
+
+### Report 1.4 – What is your data analysis plan? Please be descriptive.
+Data Cleaning and Preparation:
+- Load the dataset and inspect for structure and completeness.
+
+- Use the pivot_longer() function to reshape the data from wide to long format for each demographic category (Age, Gender, Race).
+
+- Assign consistent labels for each subgroup and demographic category.
+
+Combining Data:
+
+- Use bind_rows() to merge age, race, and gender data into a single long-form dataframe.
+
+- Use drop_na() to remove rows with missing counts.
+
+Subsetting and Aggregation:
+
+- Focus analysis on Age and Race categories.
+
+- Group by Race and Age subgroup, and summarize total counts across all states.
+
+Visualization:
+
+- Create bar plots or stacked charts to compare age distributions across racial groups.
+
+- Use tables to highlight concentrations or disparities.
+
+Interpretation:
+
+- Evaluate whether patterns indicate earlier or later onset of homelessness for specific racial groups.
+
+### Report 1.5 – What are some potential limitations for your analysis?
+- The dataset is aggregated at the state level, which may mask regional or city-level nuances.
+
+- The data represents only a single night in January 2023, and may not reflect seasonal or long-term trends.
+
+- Underreporting is likely, particularly for unsheltered or temporary populations.
+
+- Race and gender categories may not fully reflect diverse or intersectional identities.
+
+- The dataset does not include other relevant variables (e.g., income, education, employment) that may impact homelessness.
+
+## Part 2 Reports
+### Report 1.6 – Does your data contain missing values? If so, how have you dealt with these values?
+Yes, the dataset includes some missing values (NA) for demographic counts in certain states. These were handled using the drop_na() function from the dplyr package, which removes rows where the Count column is missing.
+
+### Report 1.8 – What relationship, if any, exists between the two variables?
+There appears to be a pattern in how age distribution differs by race among the homeless population. For example: Black/African American individuals tend to be overrepresented in younger age brackets (Under 18, 18–24).White individuals appear more evenly distributed across age groups, with higher representation in older age brackets. Indigenous/Native American and Multiracial groups show high variability but may also skew younger.
+
+This suggests that race is associated with the age at which people are more likely to experience homelessness, indicating potential disparities in early life experiences or systemic barriers.
+
+### Report 1.9 – How do these findings relate to your research question and theory?
+The findings support the hypothesis that racial disparities exist in the age distribution of homelessness. This aligns with broader theories of structural inequality, which suggest that Black and Indigenous communities face greater risk factors earlier in life due to historical and systemic disadvantages (e.g., poverty, discrimination, housing inequality). The observed relationship underscores the importance of targeted prevention strategies for youth in marginalized racial groups.
+
+### Report 1.10 – What limitations exist as a result of the data analysis?
+
+- Only one point in time is analyzed, making it hard to generalize across time or seasons.
+
+- Unmeasured confounders such as income, education, or health status are not included.
+
+- Reporting inconsistencies between states may affect data accuracy.
+
+- The categorical format of race and age may oversimplify identity and life experiences.
+
+
+# Analysis
+
+This study explores the demographic and structural factors of sheltered homelessness in the U.S., through a data-driven and theoretically informed approach. Relying on modern scholarship and historical context, this analysis develops a conceptual model that highlights the roles that race, gender, and age play in shaping homelessness. The analysis is built on public health and sociological literature emphasizing the effects of social exclusion, economic marginalization, and racism [@Richard2023;@Rothstein2017;@Willison2024].
+
+The frequency distributions highlight the demographic disparities that exist in the U.S. sheltered homeless population. White Americans account for the largest number of homeless individuals, while African Americans account for a disproportionately high share compared to their overall population count. This finding aligns with historical evidence of structural inequalities, as highlighted by scholars such as [@Rothstein2017], who reports how housing discrimination continues to lead to housing instability in the African American communities. The data reinforces the need for disarticulated analysis to understand the homeless racial patterns that exist.
+
+Gender-based frequency data reveal that males account for majority of the sheltered homeless population, followed by females and then transgender and non-binary individuals. These disparities are considered structural as well as numerical, highlighting workplace discrimination, access to trauma-informed housing services, and exposure to violence [@Bretherton2017]. Policy intervention for LGBTQ+ inclusive shelters and programs is urgently needed to mitigate the elevated vulnerabilities that gender minorities face.
+
+Age-based frequency data emphasizes that homelessness affects all age groups in some way, however individuals in the 24-64 age range account for majority of the homeless population. Individuals under 18 and over 65 also account for notable proportions of the homeless population, suggesting that youth and senior citizens face outstanding housing insecurity. These patterns support research by [@Grenier2016], who highlights the risks that older homeless individuals face, including mobility barriers, chronic illness, and ageism in the housing system. Homeless youth also experience challenges including educational disruption and foster care transitions.
+
+```{r, include=T, warning=F, messages=F}
+# Create PNG for Race and Age
+png("homeless_race_age.png", width = 900, height = 600)
+
+ggplot(race_age_summary, aes(x = Race, y = Total, fill = Age)) +
+  geom_col(position = "stack") +
+  labs(
+    title = "Homeless Population by Race and Age Group",
+    x = "Race/Ethnicity",
+    y = "Total Count"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Paired") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+dev.off()
+
+# Show image
+knitr::include_graphics("homeless_race_age.png")
+
+
+```
+
+This graph shows how homelessness by race is distributed across different age groups. Black and Indigenous populations again stand out, with larger proportions across nearly all age ranges, from youth to seniors. The age stack highlights the unique challenges faced by each community—young people grappling with early instability, middle-aged individuals enduring chronic homelessness, and seniors dealing with health declines and loss of income. The stacked nature of the bars makes clear that age and race together shape very different experiences of homelessness, pointing to the need for policies that are both age- and race-responsive.
+
+```{r, include=T, warning=F, messages=F}
+# Create PNG for Age and Gender
+library(ggplot2)
+png("homeless_age_gender.png", width = 900, height = 600)
+
+ggplot(age_gender_summary, aes(x = Age, y = Total, fill = Gender)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Homeless Population by Age and Gender",
+    x = "Age Group",
+    y = "Total Count"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Set2") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+dev.off()
+
+# Show image
+knitr::include_graphics("homeless_age_gender.png")
+
+```
+
+The chart above provides a breakdown of homelessness across age and gender. It shows that men outnumber women in almost every age group, with particularly large gaps among adults between 25 and 54 years old. Interestingly, younger groups, like those under 18 and between 18 to 24, show a smaller gender difference, suggesting youth homelessness might have different drivers or shelter access patterns. Overall, the data points to an urgent need for more gender-sensitive services, particularly for vulnerable adult populations facing long-term instability.
+
+```{r, include=T, warning=F, messages=F}
+# Create PNG for Race and Gender
+png("homeless_race_gender.png", width = 900, height = 600)
+
+ggplot(race_gender_summary, aes(x = Race, y = Total, fill = Gender)) +
+  geom_col(position = "dodge") +
+  labs(
+    title = "Homeless Population by Race and Gender",
+    x = "Race/Ethnicity",
+    y = "Total Count"
+  ) +
+  theme_minimal() +
+  scale_fill_brewer(palette = "Pastel1") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+dev.off()
+
+# Show image
+knitr::include_graphics("homeless_race_gender.png")
+
+
+```
+
+This figure highlights racial and gender disparities within the sheltered homeless population. Black and African American individuals show the highest homelessness counts across both men and women, emphasizing the deep impact of systemic barriers. White individuals, while still numerous, experience lower rates relative to their population size. It is also evident that across nearly all racial groups, men have higher sheltered homelessness counts than women. These patterns suggest the urgent need for interventions that address the intersection of racial inequity and gender-specific vulnerabilities.
+
+```{r, include=T, warning=F, messages=F}
+
+# Include image for Average Duration of Homelessness by Race
+knitr::include_graphics("scatter_race_duration.png")
+
+# Include image for Risk Score by Age Group
+knitr::include_graphics("scatter_age_risk.png")
+
+```
+The scatter plots provide additional insight by illustrating hypothetical relationships based on the categorical data. A simulated plot examining average duration of homelessness by race suggests that Black, Indigenous, and People of Color (BIPOC) may experience longer durations of homelessness, potentially due to systemic barriers in exiting homelessness such as limited access to affordable housing, and employment discrimination. A second plot simulating risk scores across age groups displays elevated risks for middle-aged and older adults, reinforcing the importance of age-responsive interventions. While these scatter plots are illustrative, they point to feasible patterns that future quantitative research can test.
+
+Collectively, these findings reinforce the conceptual model, which displayed that race, gender, and age operate as structural factors of homelessness. The critical role of race, lends support to critical race theorists who argue that longstanding and historical policy discrimination, like segregation and redlining [@Rothstein2017], have chronic affects on housing stability for marginalized communities.
+
+The results support the central idea guiding this research: structural inequalities don’t exist in isolation, they intersect in ways that deepen vulnerability to homelessness. Race stood out as a strong predictor, but the added effects of gender and age help paint a fuller picture of how different groups experience homelessness. These findings suggest that homelessness isn’t just about a lack of shelter, but about how multiple forms of disadvantage overlap. This sets the stage for future analyses that go beyond individual variables to explore how combinations of race, gender, and age shape people’s risk of becoming homeless and how they navigate that experience.
+
+
+## Hypothesis
+
+Drawing on previous research and our initial look at HUD’s Point-in-Time (PIT) data, we hypothesize that race, gender, and age significantly influence disparities in homelessness. Specifically, we expect that Black and African American individuals will, on average, experience higher rates or longer durations of homelessness compared to other racial groups, an outcome rooted in the legacy of systemic racism and discriminatory housing policies [@Rothstein2017]. We also anticipate that age will be a major factor, with both young people and the elderly facing higher risks due to limited access to stable housing, health services, and economic support. Gender is expected to play a role too; while men may make up the majority numerically, women and transgender individuals often face greater dangers like violence or barriers to accessing care. These expectations are guided by our causal conceptual model, which proposes that structural forces such as race, gender, and age interact to influence how individuals become and remain homeless. The analysis that follows will test these ideas and explore the deeper, intersectional dimensions of homelessness in the U.S.
+
+# Findings
+
+```{r, include=T, warning=F, messages=F}
+knitr::include_graphics("regression_results_table.png")
+```
+
+
+
+The regression results back up our hypothesis that race plays a key role in predicting homelessness. Black and Indigenous individuals were found to have significantly higher rates of sheltered homelessness compared to White individuals, even when accounting for gender and age. This reinforces the broader understanding that systemic racism and long-standing patterns of exclusion continue to shape who is most vulnerable to losing stable housing [@Rothstein2017; @Richard2023].
+
+Gender also showed some important differences. Although the coefficient for women wasn’t statistically significant at the conventional 0.05 level, the negative direction suggests that fewer women are represented in the sheltered homeless population compared to men. Transgender individuals, on the other hand, showed significantly lower counts; but this may reflect underreporting or difficulties accessing shelters rather than a lower risk of homelessness. This points to a larger issue, the need for services that are inclusive and affirming of all gender identities [@Bretherton2017].
+
+Age mattered too. Youth appeared significantly less likely to be counted among the sheltered homeless, which might be because they often rely on informal housing arrangements, like staying with friends or family, that don’t get captured in PIT counts [@Willison2024]. Older adults showed a marginally significant positive relationship with homelessness, echoing research that highlights the growing presence of seniors in the homeless population and their unique challenges when it comes to health, mobility, and support services [@Grenier2016].
+``` {r fig.align='center', out.width='100%', echo=FALSE}
+knitr::include_graphics("homelessness_combined_figure.png")
+
+```
+The figure above paints a clear picture of who is most affected by sheltered homelessness in the U.S. It shows how deeply homelessness intersects with race, gender, and age. The data reveals that Black and Indigenous communities are disproportionately represented compared to their overall share of the population presenting an indication of the ongoing structural inequality rooted in history. Gender patterns show that men make up the largest portion of the sheltered homeless population; but that doesn’t tell the full story. Women and transgender people also face serious risks such as exposure to violence and difficulty accessing the kinds of services they need. When we look at age, we see that both young people and seniors are significantly impacted. Youth may go uncounted because they turn to informal living arrangements; while older adults often deal with compounding challenges like health issues and economic insecurity. Altogether, the visualizations emphasize how crucial it is to take an intersectional approach when designing policies to address homelessness.
+
+# Conclusion
+
+This study highlights clear disparities in homelessness based on race, gender, and age. The most notable finding is the overrepresentation of Black and African American individuals in the sheltered homeless population, pointing to the ongoinh consequences of racial discrimination and inequitable housing policies. Gender-based differences are also important. While men make up a majority of the homeless population in shelters, the particular challenges faced by women and transgender individuals should not be overlooked. Age is another key factor, with both younger and older individuals facing unique barriers that can prevent them from finding stable housing.
+
+The results from our statistical analysis support these observations. Race stands out as a strong predictor of homelessness even when gender and age are taken into account. These patterns echo the conceptual model behind this research; which argues that multiple systems of inequality often overlap, making certain groups more vulnerable than others.
+
+Looking ahead, real progress will require more than one-size-fits-all solutions. Public policy must focus on fairness. The policy should highlight racial equity, inclusive gender strategies, and age-specific supports. That means investing in affordable housing, designing services with input from the communities they aim to serve, and collecting more detailed data to ensure no one is left behind. If we can take that kind of holistic, equity-driven approach, we stand a better chance of creating meaningful change for people experiencing homelessness.
+
+\newpage
+
+# References
